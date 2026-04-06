@@ -42,6 +42,32 @@ app.get('/api/health', (req, res) => {
   res.json({ status: 'ok', timestamp: new Date().toISOString() });
 });
 
+// One-time reseed endpoint (protected by secret key)
+app.post('/api/admin/reseed', async (req, res) => {
+  const { secret } = req.body;
+  if (secret !== process.env.RESEED_SECRET) {
+    return res.status(403).json({ error: 'Forbidden' });
+  }
+  try {
+    const { getDb } = require('./db');
+    const db = getDb();
+    db.exec(`
+      DELETE FROM interest_records;
+      DELETE FROM inventory;
+      DELETE FROM loan_schedule;
+      DELETE FROM payments;
+      DELETE FROM loans;
+      DELETE FROM users;
+    `);
+    // Re-run seed
+    delete require.cache[require.resolve('./seed')];
+    await require('./seed');
+    res.json({ message: 'Database reseeded successfully' });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
 // Webhook endpoints for payment providers (mock)
 app.post('/api/webhooks/gcash', (req, res) => {
   console.log('GCash webhook received:', req.body);

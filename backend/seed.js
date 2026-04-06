@@ -198,15 +198,16 @@ async function seed() {
   console.log('✅ Payments created');
   console.log('\n🎉 Seed completed successfully!');
   console.log('\n📝 Login credentials:');
-  console.log('   Admin:    admin@loanapp.ph  / admin123');
+  console.log('   Admin:    johnreymarquillero@gmail.com / rusty062498');
   console.log('   Borrower: maria@example.com / password123');
-  console.log('   Borrower: juan@example.com  / password123');
-  console.log('   Borrower: ana@example.com   / password123');
-  console.log('   Borrower: pedro@example.com / password123');
-  console.log('   Borrower: rosa@example.com  / password123');
 }
 
-seed().catch(err => {
-  console.error('Seed failed:', err);
-  process.exit(1);
-});
+module.exports = seed;
+
+// Run directly if called as script
+if (require.main === module) {
+  seed().catch(err => {
+    console.error('Seed failed:', err);
+    process.exit(1);
+  });
+}
