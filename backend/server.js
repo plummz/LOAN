@@ -12,7 +12,9 @@ initializeDb();
 
 // Middleware
 app.use(cors({
-  origin: process.env.FRONTEND_URL || 'http://localhost:5173',
+  origin: process.env.NODE_ENV === 'production'
+    ? true  // same origin in production (backend serves frontend)
+    : (process.env.FRONTEND_URL || 'http://localhost:5173'),
   credentials: true
 }));
 app.use(express.json());
@@ -55,6 +57,15 @@ app.post('/api/webhooks/palawan', (req, res) => {
   console.log('Palawan Pay webhook received:', req.body);
   res.json({ status: 'received' });
 });
+
+// Serve built frontend in production
+if (process.env.NODE_ENV === 'production') {
+  const frontendPath = path.join(__dirname, 'public');
+  app.use(express.static(frontendPath));
+  app.get('*', (req, res) => {
+    res.sendFile(path.join(frontendPath, 'index.html'));
+  });
+}
 
 // Error handler
 app.use((err, req, res, next) => {

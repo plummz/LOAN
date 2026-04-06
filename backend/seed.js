@@ -3,9 +3,22 @@ const bcrypt = require('bcryptjs');
 const { v4: uuidv4 } = require('uuid');
 const { getDb, initializeDb } = require('./db');
 
+// Check if already seeded (skip if users exist)
+function isAlreadySeeded(db) {
+  try {
+    const count = db.prepare('SELECT COUNT(*) as n FROM users').get();
+    return count.n > 0;
+  } catch { return false; }
+}
+
 async function seed() {
   initializeDb();
   const db = getDb();
+
+  if (isAlreadySeeded(db)) {
+    console.log('✅ Database already seeded, skipping.');
+    return;
+  }
 
   console.log('🌱 Seeding database...');
 
