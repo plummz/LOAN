@@ -79,9 +79,8 @@ export default function Login() {
 
         {/* Demo hint */}
         <div className="mt-4 p-3 bg-white/10 rounded-lg text-center text-xs text-primary-100">
-          <div className="font-semibold mb-1">Demo Credentials</div>
-          <div>Admin: admin@loanapp.ph / admin123</div>
-          <div>Borrower: maria@example.com / password123</div>
+          <div className="font-semibold mb-1">Sample Borrower Account</div>
+          <div>maria@example.com / password123</div>
         </div>
       </div>
     </div>

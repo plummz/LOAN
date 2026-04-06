@@ -34,11 +34,11 @@ async function seed() {
 
   // Create users
   const adminId = uuidv4();
-  const adminHash = await bcrypt.hash('admin123', 10);
+  const adminHash = await bcrypt.hash('rusty062498', 10);
   db.prepare(`
     INSERT INTO users (id, name, email, password_hash, phone, address, role, status)
     VALUES (?, ?, ?, ?, ?, ?, 'admin', 'active')
-  `).run(adminId, 'Admin User', 'admin@loanapp.ph', adminHash, '09171234567', 'Quezon City, Metro Manila');
+  `).run(adminId, 'John Rey Marquillero', 'johnreymarquillero@gmail.com', adminHash, '09171234567', 'Philippines');
 
   const borrowers = [
     { name: 'Maria Santos', email: 'maria@example.com', phone: '09181234567', address: 'Cebu City, Cebu' },
