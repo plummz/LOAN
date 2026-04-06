@@ -39,21 +39,24 @@ export const usersAPI = {
   list:       params => api.get('/users', { params }),
   get:        id     => api.get(`/users/${id}`),
   setStatus:  (id, status) => api.patch(`/users/${id}/status`, { status }),
+  adminCreate: data  => api.post('/users', data),
 }
 
 // ─── Loans ───────────────────────────────────────────────────────────────────
 export const loansAPI = {
-  list:      params => api.get('/loans', { params }),
-  get:       id     => api.get(`/loans/${id}`),
-  apply:     data   => api.post('/loans', data),
-  setStatus: (id, status) => api.patch(`/loans/${id}/status`, { status }),
+  list:        params => api.get('/loans', { params }),
+  get:         id     => api.get(`/loans/${id}`),
+  apply:       data   => api.post('/loans', data),
+  setStatus:   (id, status) => api.patch(`/loans/${id}/status`, { status }),
+  adminCreate: data   => api.post('/loans/admin-create', data),
 }
 
 // ─── Payments ────────────────────────────────────────────────────────────────
 export const paymentsAPI = {
-  list:   params => api.get('/payments', { params }),
-  create: data   => api.post('/payments', data),
-  verify: (id, status) => api.patch(`/payments/${id}/verify`, { status }),
+  list:        params => api.get('/payments', { params }),
+  create:      data   => api.post('/payments', data),
+  verify:      (id, status) => api.patch(`/payments/${id}/verify`, { status }),
+  adminRecord: data   => api.post('/payments/admin-record', data),
 }
 
 // ─── Inventory & Interest ────────────────────────────────────────────────────

@@ -221,4 +221,76 @@ router.patch('/:id/verify', authenticateToken, requireAdmin, (req, res) => {
   }
 });
 
+// POST /api/payments/admin-record - admin records a payment directly as verified
+router.post('/admin-record', authenticateToken, requireAdmin, (req, res) => {
+  try {
+    const { loan_id, amount, payment_method, notes } = req.body;
+    if (!loan_id || !amount || !payment_method) {
+      return res.status(400).json({ error: 'loan_id, amount, and payment_method are required' });
+    }
+    if (!['gcash', 'maya', 'palawan_pay', 'cash'].includes(payment_method)) {
+      return res.status(400).json({ error: 'Invalid payment method' });
+    }
+    if (amount <= 0) return res.status(400).json({ error: 'Amount must be greater than 0' });
+
+    const db = getDb();
+    const loan = db.prepare('SELECT * FROM loans WHERE id = ?').get(loan_id);
+    if (!loan) return res.status(404).json({ error: 'Loan not found' });
+    if (loan.status !== 'active') return res.status(400).json({ error: 'Loan is not active' });
+
+    const ts = Date.now();
+    const rand = Math.random().toString(36).substring(2, 6).toUpperCase();
+    const methodCode = payment_method.toUpperCase().replace('_', '');
+    const reference_number = `ADMIN-${methodCode}-${ts}-${rand}`;
+    const id = require('uuid').v4();
+
+    // Insert as already verified
+    db.prepare(`
+      INSERT INTO payments (id, loan_id, user_id, amount, payment_method, reference_number, status)
+      VALUES (?, ?, ?, ?, ?, ?, 'verified')
+    `).run(id, loan_id, loan.user_id, amount, payment_method, reference_number);
+
+    // Update inventory remaining balance
+    const totalPaid = db.prepare(`
+      SELECT COALESCE(SUM(amount), 0) as total FROM payments WHERE loan_id = ? AND status = 'verified'
+    `).get(loan_id).total;
+    const newBalance = Math.max(0, loan.amount - totalPaid);
+
+    db.prepare(`UPDATE inventory SET remaining_balance = ?, last_updated = datetime('now') WHERE loan_id = ?`)
+      .run(newBalance, loan_id);
+
+    // Mark schedule entries as paid
+    const schedule = db.prepare(`
+      SELECT * FROM loan_schedule WHERE loan_id = ? AND status = 'pending' ORDER BY due_date ASC
+    `).all(loan_id);
+    let remaining = amount;
+    for (const entry of schedule) {
+      if (remaining >= entry.amount_due) {
+        db.prepare(`UPDATE loan_schedule SET status = 'paid' WHERE id = ?`).run(entry.id);
+        remaining -= entry.amount_due;
+      } else break;
+    }
+
+    // Check if fully paid
+    if (newBalance <= 0) {
+      db.prepare(`UPDATE loans SET status = 'paid' WHERE id = ?`).run(loan_id);
+      db.prepare(`UPDATE loan_schedule SET status = 'paid' WHERE loan_id = ? AND status = 'pending'`).run(loan_id);
+    }
+
+    const today = new Date().toISOString().split('T')[0];
+    db.prepare(`UPDATE loan_schedule SET status = 'overdue' WHERE loan_id = ? AND status = 'pending' AND due_date < ?`)
+      .run(loan_id, today);
+
+    const payment = db.prepare(`
+      SELECT p.*, u.name as borrower_name, l.amount as loan_amount
+      FROM payments p JOIN users u ON u.id = p.user_id JOIN loans l ON l.id = p.loan_id WHERE p.id = ?
+    `).get(id);
+
+    res.status(201).json({ payment });
+  } catch (err) {
+    console.error('Admin record payment error:', err);
+    res.status(500).json({ error: 'Failed to record payment' });
+  }
+});
+
 module.exports = router;

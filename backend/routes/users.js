@@ -1,8 +1,42 @@
 const express = require('express');
+const bcrypt = require('bcryptjs');
+const { v4: uuidv4 } = require('uuid');
 const { getDb } = require('../db');
 const { authenticateToken, requireAdmin } = require('../middleware/auth');
 
 const router = express.Router();
+
+// POST /api/users - admin creates a user directly
+router.post('/', authenticateToken, requireAdmin, async (req, res) => {
+  try {
+    const { name, email, password, phone, address, role = 'borrower' } = req.body;
+    if (!name || !email || !password) {
+      return res.status(400).json({ error: 'Name, email, and password are required' });
+    }
+    if (password.length < 6) {
+      return res.status(400).json({ error: 'Password must be at least 6 characters' });
+    }
+    if (!['admin', 'borrower'].includes(role)) {
+      return res.status(400).json({ error: 'Invalid role' });
+    }
+    const db = getDb();
+    const existing = db.prepare('SELECT id FROM users WHERE email = ?').get(email);
+    if (existing) return res.status(409).json({ error: 'Email already registered' });
+
+    const password_hash = await bcrypt.hash(password, 10);
+    const id = uuidv4();
+    db.prepare(`
+      INSERT INTO users (id, name, email, password_hash, phone, address, role, status)
+      VALUES (?, ?, ?, ?, ?, ?, ?, 'active')
+    `).run(id, name, email, password_hash, phone || null, address || null, role);
+
+    const user = db.prepare('SELECT id, name, email, phone, address, role, status, created_at FROM users WHERE id = ?').get(id);
+    res.status(201).json({ user });
+  } catch (err) {
+    console.error('Admin create user error:', err);
+    res.status(500).json({ error: 'Failed to create user' });
+  }
+});
 
 // GET /api/users - list all users (admin only)
 router.get('/', authenticateToken, requireAdmin, (req, res) => {

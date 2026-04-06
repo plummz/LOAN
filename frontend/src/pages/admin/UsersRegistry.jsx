@@ -1,10 +1,87 @@
 import { useEffect, useState } from 'react'
-import { Link } from 'react-router-dom'
 import { usersAPI } from '../../api'
 import Layout from '../components/Layout'
-import { Search, Users, ShieldAlert, ShieldCheck } from 'lucide-react'
+import { Search, Users, ShieldAlert, ShieldCheck, UserPlus, X, Loader2, Eye, EyeOff } from 'lucide-react'
 
 const fmtDate = d => new Date(d).toLocaleDateString('en-PH', { year: 'numeric', month: 'short', day: 'numeric' })
+
+function AddUserModal({ onClose, onSuccess }) {
+  const [form, setForm] = useState({ name: '', email: '', password: '', phone: '', address: '', role: 'borrower' })
+  const [showPass, setShowPass] = useState(false)
+  const [loading, setLoading] = useState(false)
+  const [error, setError] = useState('')
+  const handle = e => setForm(f => ({ ...f, [e.target.name]: e.target.value }))
+
+  const submit = async e => {
+    e.preventDefault()
+    setError('')
+    setLoading(true)
+    try {
+      await usersAPI.adminCreate(form)
+      onSuccess()
+      onClose()
+    } catch (err) {
+      setError(err.response?.data?.error || 'Failed to create user')
+    } finally { setLoading(false) }
+  }
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
+      <div className="bg-white rounded-2xl shadow-2xl w-full max-w-md">
+        <div className="flex items-center justify-between px-6 py-4 border-b">
+          <h2 className="text-lg font-semibold text-gray-800">Add New User</h2>
+          <button onClick={onClose} className="text-gray-400 hover:text-gray-600"><X size={20} /></button>
+        </div>
+        <form onSubmit={submit} className="p-6 space-y-4">
+          {error && <div className="p-3 bg-red-50 border border-red-200 text-red-700 rounded-lg text-sm">{error}</div>}
+          <div>
+            <label className="label">Full Name <span className="text-red-500">*</span></label>
+            <input name="name" className="input" placeholder="Juan dela Cruz" value={form.name} onChange={handle} required />
+          </div>
+          <div>
+            <label className="label">Email <span className="text-red-500">*</span></label>
+            <input name="email" type="email" className="input" placeholder="juan@example.com" value={form.email} onChange={handle} required />
+          </div>
+          <div>
+            <label className="label">Password <span className="text-red-500">*</span></label>
+            <div className="relative">
+              <input name="password" type={showPass ? 'text' : 'password'} className="input pr-10"
+                placeholder="At least 6 characters" value={form.password} onChange={handle} required />
+              <button type="button" onClick={() => setShowPass(p => !p)}
+                className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600">
+                {showPass ? <EyeOff size={16} /> : <Eye size={16} />}
+              </button>
+            </div>
+          </div>
+          <div className="grid grid-cols-2 gap-3">
+            <div>
+              <label className="label">Phone</label>
+              <input name="phone" className="input" placeholder="09XXXXXXXXX" value={form.phone} onChange={handle} />
+            </div>
+            <div>
+              <label className="label">Role</label>
+              <select name="role" className="input" value={form.role} onChange={handle}>
+                <option value="borrower">Borrower</option>
+                <option value="admin">Admin</option>
+              </select>
+            </div>
+          </div>
+          <div>
+            <label className="label">Address</label>
+            <input name="address" className="input" placeholder="City, Province" value={form.address} onChange={handle} />
+          </div>
+          <div className="flex gap-3 pt-2">
+            <button type="button" onClick={onClose} className="btn-secondary flex-1">Cancel</button>
+            <button type="submit" disabled={loading} className="btn-primary flex-1 flex items-center justify-center gap-2">
+              {loading && <Loader2 size={14} className="animate-spin" />}
+              {loading ? 'Creating…' : 'Create User'}
+            </button>
+          </div>
+        </form>
+      </div>
+    </div>
+  )
+}
 
 export default function UsersRegistry() {
   const [users, setUsers] = useState([])
@@ -14,6 +91,7 @@ export default function UsersRegistry() {
   const [role, setRole] = useState('')
   const [loading, setLoading] = useState(true)
   const [actionId, setActionId] = useState(null)
+  const [showAddUser, setShowAddUser] = useState(false)
 
   const load = () => {
     setLoading(true)
@@ -43,9 +121,14 @@ export default function UsersRegistry() {
   return (
     <Layout>
       <div className="max-w-6xl mx-auto">
-        <div className="mb-6">
-          <h1 className="text-2xl font-bold text-gray-800">User Registry</h1>
-          <p className="text-gray-500 text-sm">{total} registered users</p>
+        <div className="mb-6 flex items-center justify-between">
+          <div>
+            <h1 className="text-2xl font-bold text-gray-800">User Registry</h1>
+            <p className="text-gray-500 text-sm">{total} registered users</p>
+          </div>
+          <button onClick={() => setShowAddUser(true)} className="btn-primary flex items-center gap-2 text-sm">
+            <UserPlus size={16} /> Add User
+          </button>
         </div>
 
         {/* Filters */}
@@ -115,9 +198,7 @@ export default function UsersRegistry() {
                       {u.role !== 'admin' && (
                         <button onClick={() => toggleStatus(u)} disabled={actionId === u.id}
                           className={`flex items-center gap-1 text-xs px-2 py-1 rounded font-medium transition ${
-                            u.status === 'active'
-                              ? 'bg-red-50 text-red-600 hover:bg-red-100'
-                              : 'bg-green-50 text-green-600 hover:bg-green-100'
+                            u.status === 'active' ? 'bg-red-50 text-red-600 hover:bg-red-100' : 'bg-green-50 text-green-600 hover:bg-green-100'
                           }`}>
                           {u.status === 'active' ? <ShieldAlert size={12} /> : <ShieldCheck size={12} />}
                           {u.status === 'active' ? 'Suspend' : 'Activate'}
@@ -129,8 +210,6 @@ export default function UsersRegistry() {
               </tbody>
             </table>
           )}
-
-          {/* Pagination */}
           {pages > 1 && (
             <div className="flex items-center justify-between px-4 py-3 border-t bg-gray-50">
               <span className="text-xs text-gray-400">Page {page} of {pages}</span>
@@ -142,6 +221,8 @@ export default function UsersRegistry() {
           )}
         </div>
       </div>
+
+      {showAddUser && <AddUserModal onClose={() => setShowAddUser(false)} onSuccess={load} />}
     </Layout>
   )
 }

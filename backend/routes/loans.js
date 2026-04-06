@@ -309,4 +309,47 @@ router.patch('/:id/status', authenticateToken, requireAdmin, (req, res) => {
   }
 });
 
+// POST /api/loans/admin-create - admin creates a loan directly as active
+router.post('/admin-create', authenticateToken, requireAdmin, (req, res) => {
+  try {
+    const { user_id, amount, purpose, term_months, interest_rate = 3.0, start_date } = req.body;
+    if (!user_id || !amount || !purpose || !term_months) {
+      return res.status(400).json({ error: 'user_id, amount, purpose, and term_months are required' });
+    }
+    if (amount < 100000) return res.status(400).json({ error: 'Minimum loan amount is ₱1,000' });
+    if (amount > 50000000) return res.status(400).json({ error: 'Maximum loan amount is ₱500,000' });
+    if (term_months < 1 || term_months > 60) return res.status(400).json({ error: 'Term must be 1–60 months' });
+
+    const db = getDb();
+    const borrower = db.prepare('SELECT id FROM users WHERE id = ?').get(user_id);
+    if (!borrower) return res.status(404).json({ error: 'Borrower not found' });
+
+    const activeLoan = db.prepare(`
+      SELECT id FROM loans WHERE user_id = ? AND status IN ('pending', 'approved', 'active')
+    `).get(user_id);
+    if (activeLoan) return res.status(400).json({ error: 'Borrower already has an active or pending loan' });
+
+    const id = uuidv4();
+    const now = new Date().toISOString();
+    db.prepare(`
+      INSERT INTO loans (id, user_id, amount, purpose, term_months, interest_rate, status, approved_by, approved_at, created_at)
+      VALUES (?, ?, ?, ?, ?, ?, 'active', ?, ?, ?)
+    `).run(id, user_id, amount, purpose, term_months, interest_rate, req.user.id, now, now);
+
+    generateAmortizationSchedule(id, amount, term_months, interest_rate, start_date || now);
+
+    const loan = db.prepare(`
+      SELECT l.*, u.name as borrower_name, a.name as approved_by_name
+      FROM loans l JOIN users u ON u.id = l.user_id
+      LEFT JOIN users a ON a.id = l.approved_by
+      WHERE l.id = ?
+    `).get(id);
+
+    res.status(201).json({ loan });
+  } catch (err) {
+    console.error('Admin create loan error:', err);
+    res.status(500).json({ error: 'Failed to create loan' });
+  }
+});
+
 module.exports = router;
