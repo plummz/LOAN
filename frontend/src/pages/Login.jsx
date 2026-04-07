@@ -1,7 +1,7 @@
 import { useState } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
 import { useAuth } from '../context/AuthContext'
-import { Eye, EyeOff, Loader2 } from 'lucide-react'
+import { Eye, EyeOff, Loader2, RefreshCw } from 'lucide-react'
 
 export default function Login() {
   const { login } = useAuth()
@@ -10,6 +10,8 @@ export default function Login() {
   const [showPass, setShowPass] = useState(false)
   const [error, setError] = useState('')
   const [loading, setLoading] = useState(false)
+  const [reseeding, setReseeding] = useState(false)
+  const [reseedMsg, setReseedMsg] = useState('')
 
   const handle = e => setForm(f => ({ ...f, [e.target.name]: e.target.value }))
 
@@ -24,6 +26,28 @@ export default function Login() {
       setError(err.response?.data?.error || 'Login failed. Please try again.')
     } finally {
       setLoading(false)
+    }
+  }
+
+  const reseedDb = async () => {
+    setReseeding(true)
+    setReseedMsg('')
+    try {
+      const res = await fetch('/api/admin/reseed', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ secret: 'jrm-reset-2026' })
+      })
+      const data = await res.json()
+      if (res.ok) {
+        setReseedMsg('✅ Done! Login with johnreymarquillero@gmail.com / rusty062498')
+      } else {
+        setReseedMsg('❌ ' + (data.error || 'Failed'))
+      }
+    } catch (e) {
+      setReseedMsg('❌ Could not reach server.')
+    } finally {
+      setReseeding(false)
     }
   }
 
@@ -77,10 +101,18 @@ export default function Login() {
           </p>
         </div>
 
-        {/* Demo hint */}
-        <div className="mt-4 p-3 bg-white/10 rounded-lg text-center text-xs text-primary-100">
-          <div className="font-semibold mb-1">Sample Borrower Account</div>
-          <div>maria@example.com / password123</div>
+        {/* First-time setup */}
+        <div className="mt-4 p-4 bg-white/10 rounded-xl text-center">
+          <p className="text-primary-200 text-xs mb-2">First time setup? Reset the database with your admin account.</p>
+          {reseedMsg ? (
+            <p className="text-sm font-medium text-white">{reseedMsg}</p>
+          ) : (
+            <button onClick={reseedDb} disabled={reseeding}
+              className="flex items-center gap-2 mx-auto px-4 py-2 bg-gold-500 hover:bg-gold-600 text-white text-sm font-medium rounded-lg transition disabled:opacity-60">
+              {reseeding ? <Loader2 size={14} className="animate-spin" /> : <RefreshCw size={14} />}
+              {reseeding ? 'Resetting…' : 'Reset & Setup Database'}
+            </button>
+          )}
         </div>
       </div>
     </div>
